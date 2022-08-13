@@ -2,12 +2,17 @@ package com.example.conversormoedas;
 
 import androidx.appcompat.app.AppCompatActivity;
 
+import android.hardware.Sensor;
+import android.hardware.SensorEvent;
+import android.hardware.SensorEventListener;
+import android.hardware.SensorManager;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Spinner;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import com.google.gson.Gson;
 
@@ -27,6 +32,9 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
 
     private String selectedCurrency;
     private final OkHttpClient client = new OkHttpClient();
+    private SensorManager sensorManager;
+    private Sensor proximitySensor;
+    private SensorEventListener proximitySensorListener;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -38,9 +46,45 @@ public class MainActivity extends AppCompatActivity implements AdapterView.OnIte
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         spinner.setAdapter(adapter);
         spinner.setOnItemSelectedListener(this);
+
+        sensorManager = (SensorManager) getSystemService(SENSOR_SERVICE);
+        proximitySensor = sensorManager.getDefaultSensor(Sensor.TYPE_PROXIMITY);
+
+        if (proximitySensor == null) {
+            Toast.makeText(this, "Sensor de proximidade não disponível", Toast.LENGTH_LONG).show();
+            finish();
+        }
+
+        proximitySensorListener = new SensorEventListener() {
+            @Override
+            public void onSensorChanged(SensorEvent event) {
+                if (event.values[0] < proximitySensor.getMaximumRange()) {
+                    makeRequest();
+                }
+            }
+
+            @Override
+            public void onAccuracyChanged(Sensor sensor, int accuracy) {
+
+            }
+        };
+
+        sensorManager.registerListener(proximitySensorListener, proximitySensor, SensorManager.SENSOR_DELAY_NORMAL);
+
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+
+        sensorManager.unregisterListener(proximitySensorListener);
     }
 
     public void onButtonClick(View view) {
+        makeRequest();
+    }
+
+    public void makeRequest() {
 
         Request request = new Request.Builder()
                 .url("https://economia.awesomeapi.com.br/last/" + selectedCurrency + "-BRL")
